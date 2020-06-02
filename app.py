@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Float
+from flask_marshmallow import Marshmallow
 
 import os
 
@@ -10,6 +11,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'planets.db')
 
 db = SQLAlchemy(app)  # initialise the db
+ma = Marshmallow(app) # to serialize
 
 
 @app.cli.command('db_create')
@@ -26,7 +28,7 @@ def db_drop():
 
 @app.cli.command('db_seed')
 def db_seed():
-    mercury = Planets(
+    mercury = Planet(
                       planet_name='Mercury',
                       planet_type='Class D',
                       home_star='Sol',
@@ -34,7 +36,7 @@ def db_seed():
                       radius=1516,
                       distance=35.98e6
                       )
-    venus = Planets(
+    venus = Planet(
                       planet_name='Venus',
                       planet_type='Class K',
                       home_star='Sol',
@@ -42,7 +44,7 @@ def db_seed():
                       radius=3760,
                       distance=67.24e6
                       )
-    earth = Planets(
+    earth = Planet(
                       planet_name='Earth',
                       planet_type='Class M',
                       home_star='Sol',
@@ -100,9 +102,9 @@ def url_variables(name: str, age: int):
 
 @app.route('/planets',methods=["GET"])
 def planets():
-    planets_list = Planets.query.all()
-    print(planets_list)
-    return jsonify(planets_list)
+    planets_list = Planet.query.all()
+    result = planets_schema.dump(planets_list) # dump to serialise(textual format)
+    return jsonify(result)
 
 
 # database models
@@ -115,7 +117,7 @@ class User(db.Model):
     password = Column(String)
 
 
-class Planets(db.Model):
+class Planet(db.Model):
     __tablename__ = 'planets'
     planet_id = Column(Integer, primary_key=True)
     planet_name = Column(String)
@@ -125,6 +127,24 @@ class Planets(db.Model):
     radius = Column(Float)
     distance = Column(Float)
 
+
+class UserSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'first_name', 'last_name', 'email', 'password')
+
+
+class PlanetSchema(ma.Schema):
+    class Meta:
+        fields = ('planet_id', 'planet_name', 'planet_type', 'home_star', 'mass', 'radius', 'distance')
+
+
+'''
+instanciating the Schema class and handling the case if we get collection of records(many users) by many=True
+'''
+user_schema = UserSchema()
+users_schema = UserSchema(many=True)
+planet_schema = PlanetSchema()
+planets_schema = PlanetSchema(many=True)
 
 if __name__ == '__main__':
     app.run(debug=True)
